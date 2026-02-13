@@ -1,41 +1,83 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF, Text } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
+import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
+
+/* =========================
+   MODEL LOADER
+========================= */
+
+function GLBModel({ path }) {
+  const groupRef = useRef();
+
+  try {
+    const { scene } = useGLTF(path);
+
+    return (
+      <primitive
+        ref={groupRef}
+        object={scene}
+        scale={1}
+      />
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+/* =========================
+   FALLBACK GEOMETRY
+========================= */
+
+function FallbackModel() {
+  return (
+    <mesh>
+      <boxGeometry args={[1.5, 1.5, 1.5]} />
+      <meshStandardMaterial
+        color="#999"
+        metalness={0.8}
+        roughness={0.2}
+      />
+    </mesh>
+  );
+}
+
+/* =========================
+   MAIN COMPONENT
+========================= */
 
 export default function ArsenalItem({ item }) {
   const groupRef = useRef();
+  const navigate = useNavigate();
+  const [hovered, setHovered] = useState(false);
 
-  // load model based on id
-  const { scene } = useGLTF(`/models/${item.id}.glb`);
+  const modelPath = `/models/${item.id}.glb`;
 
-  // subtle floating animation
-  useFrame((state) => {
+  /* ---------- HOVER ANIMATION ---------- */
+  useFrame(() => {
     if (!groupRef.current) return;
 
-    groupRef.current.position.y =
-      Math.sin(state.clock.elapsedTime * 2) * 0.2;
+    const targetScale = hovered ? 1.15 : 1;
 
-    groupRef.current.rotation.y += 0.005;
+    groupRef.current.scale.lerp(
+      new THREE.Vector3(targetScale, targetScale, targetScale),
+      0.1
+    );
   });
 
   return (
-    <group ref={groupRef}>
-      
-      {/* 3D MODEL */}
-      <primitive object={scene} scale={1.2} />
+    <group
+      ref={groupRef}
+      onClick={() => navigate(`/${item.id}`)}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+    >
+      {/* Try loading GLB */}
+      <GLBModel path={modelPath} />
 
-      {/* TEXT BELOW MODEL */}
-      <Text
-        position={[0, -2, 0]}
-        fontSize={0.8}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {item.title}
-      </Text>
-
+      {/* If no GLB found, fallback */}
+      {!modelPath && <FallbackModel />}
     </group>
   );
 }

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { OrbitControls, useGLTF, Text } from "@react-three/drei";
 import * as THREE from "three";
 import ArsenalItem from "./ArsenalItem";
 import items from "../data/items";
@@ -9,20 +9,16 @@ import items from "../data/items";
    CONFIG
 ========================= */
 
-// Statue center (Orbit target)
-const STATUE_CENTER = [13, 1, -12];
+const STATUE_CENTER = [13, -1, -12];
 
-// 🌍 World settings
-const WORLD_POSITION = [13, -6.5, -12];
+const WORLD_POSITION = [13, -7.5, -12];
 const WORLD_SCALE = 0.2;
 
-// 🎯 Wheel settings
 const WHEEL_CENTER = [11, 3, -8.5];
 const WHEEL_RADIUS = 8;
 
-// 🎥 CAMERA START POSITION (EDIT THIS)
-const CAMERA_POSITION = [25, 8, 5]; 
-// ↑ change these values to adjust angle
+const AUTO_ROTATE_SPEED = 0.12;
+const ROTATION_SMOOTHNESS = 0.08;
 
 /* =========================
    WORLD
@@ -50,31 +46,28 @@ export default function ArsenalScene() {
   const { camera } = useThree();
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [autoRotate, setAutoRotate] = useState(true);
 
-  /* =========================
-     SET CAMERA POSITION
-  ========================= */
-
+  /* ---------- CAMERA ALIGN ---------- */
   useEffect(() => {
-    camera.position.set(...CAMERA_POSITION);
-    camera.lookAt(...STATUE_CENTER);
+    camera.position.set(
+      STATUE_CENTER[0] + 12, 
+      STATUE_CENTER[1] + 15,   // 🔥 Slightly higher now
+      STATUE_CENTER[2] + 16 
+    );
 
-    if (controlsRef.current) {
-      controlsRef.current.target.set(...STATUE_CENTER);
-      controlsRef.current.update();
-    }
+    camera.lookAt(...STATUE_CENTER);
   }, [camera]);
 
-  /* =========================
-     WHEEL ROTATION
-  ========================= */
-
+  /* ---------- KEYBOARD ---------- */
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "ArrowRight") {
+        setAutoRotate(false);
         setActiveIndex((prev) => (prev + 1) % items.length);
       }
       if (e.key === "ArrowLeft") {
+        setAutoRotate(false);
         setActiveIndex((prev) =>
           prev === 0 ? items.length - 1 : prev - 1
         );
@@ -85,41 +78,48 @@ export default function ArsenalScene() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  useFrame(() => {
+  /* ---------- WHEEL ROTATION ---------- */
+  useFrame((state, delta) => {
     if (!wheelRef.current) return;
 
-    const targetRotation =
-      (-activeIndex / items.length) * Math.PI * 2;
+    if (autoRotate) {
+      wheelRef.current.rotation.y += delta * AUTO_ROTATE_SPEED;
+    } else {
+      const target =
+        (-activeIndex / items.length) * Math.PI * 2;
 
-    wheelRef.current.rotation.y = THREE.MathUtils.lerp(
-      wheelRef.current.rotation.y,
-      targetRotation,
-      0.1
-    );
+      wheelRef.current.rotation.y = THREE.MathUtils.lerp(
+        wheelRef.current.rotation.y,
+        target,
+        ROTATION_SMOOTHNESS
+      );
+    }
   });
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.8} />
-
+      {/* LIGHTING */}
+      <ambientLight intensity={0.6} />
       <directionalLight
-        position={[10, 20, 10]}
-        intensity={1.5}
+        position={[13, 15, -8]}
+        intensity={2}
+        castShadow
+      />
+      <spotLight
+        position={[13, 20, -12]}
+        angle={0.4}
+        intensity={2}
+        penumbra={1}
       />
 
-      <pointLight
-        position={[13, 10, -12]}
-        intensity={20}
-      />
-
-      {/* World */}
+      {/* WORLD */}
       <World />
 
-      {/* Weapon Wheel */}
+      {/* WHEEL */}
       <group ref={wheelRef} position={WHEEL_CENTER}>
         {items.map((item, index) => {
-          const angle = (index / items.length) * Math.PI * 2;
+          const angle =
+            (index / items.length) * Math.PI * 2;
 
           const x = Math.cos(angle) * WHEEL_RADIUS;
           const z = Math.sin(angle) * WHEEL_RADIUS;
@@ -127,33 +127,43 @@ export default function ArsenalScene() {
           return (
             <group key={item.id} position={[x, 0, z]}>
               <ArsenalItem item={item} />
+
+              <Text
+                position={[0, -1.8, 0]}
+                fontSize={0.5}
+                color="white"
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={0.02}
+                outlineColor="black"
+              >
+                {item.title}
+              </Text>
             </group>
           );
         })}
       </group>
 
-      {/* Orbit Controls */}
+      {/* CAMERA CONTROLS */}
       <OrbitControls
-  ref={controlsRef}
-  target={STATUE_CENTER}
-  enableRotate={true}
-  enablePan={false}
-  enableZoom={true}
-  enableDamping
-  dampingFactor={0.08}
+        ref={controlsRef}
+        target={STATUE_CENTER}
+        enableRotate
+        enablePan={false}
+        enableZoom
+        enableDamping
+        dampingFactor={0.08}
 
-  // 🔒 Lock horizontal freedom
-  minAzimuthAngle={-Infinity}
-  maxAzimuthAngle={Infinity}
+        // 🔒 Very small vertical movement
+        minPolarAngle={Math.PI / 2 - 0.12}
+        maxPolarAngle={Math.PI / 2 + 0.12}
 
-  // 🎯 Slight vertical movement only
-  minPolarAngle={Math.PI / 2 - 0.15}
-  maxPolarAngle={Math.PI / 2 + 0.15}
+        // 🔥 Force zoom straight to center
+        zoomToCursor={false}
 
-  // 🔍 Zoom limits
-  minDistance={15}
-  maxDistance={40}
-/>
+        minDistance={10}
+        maxDistance={30}
+      />
     </>
   );
 }

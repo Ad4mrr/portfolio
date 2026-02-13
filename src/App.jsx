@@ -1,21 +1,18 @@
-import { Canvas } from "@react-three/fiber";
-import { Suspense } from "react";
-import ArsenalScene from "./scene/ArsenalScene";
-import "./styles.css";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import About from "./pages/About";
+import Ai from "./pages/Ai";
+import Backend from "./pages/Backend";
 
 export default function App() {
   return (
-    <div className="page">
-      <div className="canvasWrap">
-        <Canvas
-          camera={{ position: [25, -8, 4], fov: 50 }}
-          shadows
-        >
-          <Suspense fallback={null}>
-            <ArsenalScene />
-          </Suspense>
-        </Canvas>
-      </div>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/ai" element={<Ai />} />
+        <Route path="/backend" element={<Backend />} />
+      </Routes>
+    </Router>
   );
 }
